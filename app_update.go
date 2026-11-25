@@ -17,6 +17,8 @@ import (
 	"time"
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"espcrypt/internal/vault"
 )
 
 const updateRepo = "espcrypt/manager"
@@ -249,8 +251,22 @@ func (a *App) installWindows(setup string) error {
 	if err != nil {
 		return err
 	}
-	script := fmt.Sprintf(`timeout /t 2 /nobreak >nul & "%s" /S & start "" "%s"`, setup, exe)
-	cmd := exec.Command("cmd", "/C", script)
+	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	ps := fmt.Sprintf(`$ErrorActionPreference = 'Continue'
+Wait-Process -Id %d -Timeout 60 -ErrorAction SilentlyContinue
+try {
+  $p = Start-Process -FilePath %s -ArgumentList '/S' -Verb RunAs -Wait -PassThru
+  Set-Content -Path %s -Value ("exit " + $p.ExitCode)
+} catch {
+  Set-Content -Path %s -Value ("error " + $_.Exception.Message)
+}
+Start-Process -FilePath %s
+`, os.Getpid(), q(setup), q(updateResultFile()), q(updateResultFile()), q(exe))
+	script := filepath.Join(filepath.Dir(setup), "install.ps1")
+	if err := os.WriteFile(script, []byte(ps), 0o600); err != nil {
+		return err
+	}
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script)
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
@@ -261,3 +277,22 @@ func (a *App) installWindows(setup string) error {
 }
 
 func (a *App) AppVersion() string { return appVersion }
+
+func updateResultFile() string { return filepath.Join(vault.ConfigDir(), "update-result.txt") }
+
+func (a *App) reportUpdateResult() {
+	b, err := os.ReadFile(updateResultFile())
+	if err != nil {
+		return
+	}
+	_ = os.Remove(updateResultFile())
+	r := strings.TrimSpace(string(b))
+	switch {
+	case r == "exit 0":
+		a.logf("info", "[Update] ESP Crypt %s was installed", appVersion)
+	case strings.HasPrefix(r, "error "):
+		a.logf("error", "[Update] The installer did not run: %s", strings.TrimPrefix(r, "error "))
+	default:
+		a.logf("error", "[Update] The installer failed (%s)", r)
+	}
+}
