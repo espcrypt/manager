@@ -1,0 +1,29 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "ESP Crypt",
+  "outputfilename": "ESP-Crypt",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Jeffrey Reij",
+    "email": "jeffreyreij@gmail.com"
+  },
+  "info": {
+    "companyName": "Jeffrey Reij",
+    "productName": "ESP Crypt",
+    "productVersion": "0.0.0",
+    "copyright": "\u00a9 2026 Jeffrey Reij",
+    "comments": "Encrypted VeraCrypt vaults protected by custom ESP32-C3 and ESP32-S3 firmware",
+    "fileAssociations": [
+      {
+        "ext": "hc32",
+        "name": "ESP Crypt",
+        "description": "Encrypted vault protected by custom ESP32 firmware",
+        "iconName": "vaulticon",
+        "role": "Editor"
+      }
+    ]
+  }
+}
