@@ -259,3 +259,5 @@ func (a *App) installWindows(setup string) error {
 	go func() { time.Sleep(500 * time.Millisecond); a.QuitApp() }()
 	return nil
 }
+
+func (a *App) AppVersion() string { return appVersion }
