@@ -1,5 +1,7 @@
 <script>
   let update = $state(null)
+  let appVersion = $state('')
+  onMount(async () => { appVersion = await Go.AppVersion() })
   let updating = $state(false)
   onMount(() => EventsOn('update:available', (u) => { update = u }))
   async function installUpdate() {
@@ -30,7 +32,7 @@
     { id: 'passkeys', label: 'Passkeys', icon: 'key', comp: Passkeys, intro: 'ESP32-S3 security keys running the Passkey firmware: passkeys, PIN and settings. Windows, macOS and browsers use the key directly.' },
     { id: 'mirror', label: 'Backup & mirror', icon: 'database', comp: Mirror, intro: 'Keep a second ESP32 as an exact, automatically synced copy, or save an encrypted backup file.' },
     { id: 'wireless', label: 'Wireless', icon: 'wifi', comp: Wireless, intro: 'Optionally keep a mirrored ESP32 in sync over Wi-Fi when it is not plugged in. Off until you turn it on here over USB.' },
-    { id: 'security', label: 'Passphrase & security', icon: 'shield', comp: Security, intro: 'Manage the Vault passphrase and review the reflashable security profile.' },
+    { id: 'security', label: 'Security & updates', icon: 'shield', comp: Security, intro: 'Vault passphrase, vault locking, app updates and the security profile.' },
     { group: 'Device' },
     { id: 'esp32', label: 'ESP32 firmware', icon: 'chip', comp: ESP32, intro: 'Install signed custom firmware for ESP32-C3, ESP32-C6 and ESP32-S3.' },
     { id: 'log', label: 'Activity log', icon: 'list', comp: Log, intro: 'Everything the app did, with timestamps.' },
@@ -173,6 +175,7 @@
         </div>
       </div>
       <button class="w-full rounded-lg px-2 py-1.5 text-left text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200" onclick={() => Go.QuitApp()}>Quit ESP Crypt</button>
+      <button class="w-full px-2 text-left text-[11px] text-neutral-600 hover:text-neutral-300" onclick={() => (app.page = 'security')} title="App updates">{appVersion === 'dev' ? 'development build' : appVersion ? `v${appVersion}` : ''}{update?.available ? ' · update available' : ''}</button>
     </div>
   </aside>
 
