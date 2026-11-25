@@ -9,6 +9,8 @@ import {veracrypt} from '../models';
 
 export function AgentStatus():Promise<main.AgentStatus>;
 
+export function AppVersion():Promise<string>;
+
 export function BackupToFile():Promise<string>;
 
 export function ChangePIN(arg1:string,arg2:string):Promise<void>;
