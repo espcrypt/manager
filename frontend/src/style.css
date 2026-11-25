@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+html, body { background: #1a1a1a; color: #e5e5e5; user-select: none; -webkit-user-select: none; }
+input, textarea, select, .selectable, pre, code { user-select: text; -webkit-user-select: text; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.kv dd, .truncate-anywhere { overflow-wrap: anywhere; }
+@layer base {
+  main p, main li, main dd, main .card, main .callout, main .hint, main .font-medium, main .font-mono { overflow-wrap: break-word; word-break: break-word; }
+  main .flex > *, main .grid > * { min-width: 0; }
+  main select { text-overflow: ellipsis; }
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 8px; border: 2px solid #1a1a1a; }
+
+@layer components {
+  .card { @apply rounded-2xl border border-neutral-700/50 bg-neutral-800/60 p-5 shadow-sm shadow-black/30; }
+  .card-title { @apply mb-4 flex items-center gap-2 text-base font-semibold text-neutral-100; }
+  .btn { @apply inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border whitespace-nowrap border-neutral-600/70 bg-neutral-700/70 px-3.5 py-2 text-sm font-medium text-neutral-100 transition hover:bg-neutral-600 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-sm { @apply h-8 px-2.5 py-1 text-xs; }
+  .btn-primary { @apply border-violet-500/60 bg-violet-600 text-white hover:bg-violet-500; }
+  .btn-danger { @apply border-rose-500/50 bg-rose-600/90 text-white hover:bg-rose-500; }
+  .btn-ghost { @apply border-transparent bg-transparent hover:bg-neutral-700/60; }
+  .page-intro { @apply mb-6 max-w-3xl text-sm leading-relaxed text-neutral-400; }
+  .step { @apply flex items-start gap-4 rounded-xl border border-neutral-700/50 bg-neutral-900/40 p-4; }
+  .step-num { @apply grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-semibold; }
+  .callout { @apply rounded-xl border p-4 text-sm leading-relaxed; }
+  .callout-warn { @apply border-amber-500/30 bg-amber-500/10 text-amber-100; }
+  .callout-info { @apply border-neutral-600/60 bg-neutral-700/30 text-neutral-200; }
+  .input { @apply h-9 w-full rounded-lg border border-neutral-600/70 bg-neutral-900/80 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20; }
+  .input-sm { @apply h-8 py-1 text-xs; }
+  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-400; }
+  .badge { @apply inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium; }
+  .badge-ok { @apply bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30; }
+  .badge-warn { @apply bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30; }
+  .badge-err { @apply bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30; }
+  .badge-muted { @apply bg-neutral-700/40 text-neutral-300 ring-1 ring-neutral-600/40; }
+  .hint { @apply text-xs leading-relaxed text-neutral-400; }
+  .check { @apply flex cursor-pointer items-center gap-2 text-sm text-neutral-200; }
+  .check input { @apply h-4 w-4 accent-violet-500; }
+  .tab { @apply rounded-lg px-3 py-1.5 text-sm text-neutral-400 hover:text-neutral-100; }
+  .tab-active { @apply bg-neutral-700 text-white; }
+  .kv { @apply grid grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-sm; }
+  .kv dt { @apply text-neutral-400; }
+  .kv dd { @apply break-all font-mono text-neutral-200; }
+}
