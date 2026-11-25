@@ -1,0 +1,159 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: v
+        run: |
+          last=$(git tag -l 'v0.0.*' | sed 's/^v0\.0\.//' | sort -n | tail -1)
+          next=$(( ${last:-0} + 1 ))
+          echo "version=0.0.$next" >> "$GITHUB_OUTPUT"
+          echo "Next version: 0.0.$next"
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Install Wails CLI
+        shell: bash
+        run: bash scripts/install-wails.sh
+      - name: Set version
+        run: |
+          jq --arg v "${{ needs.version.outputs.version }}" '.info.productVersion = $v' wails.json > w.json && mv w.json wails.json
+      - name: Build universal app
+        run: wails build -platform darwin/universal -clean -ldflags "-X main.appVersion=${{ needs.version.outputs.version }}"
+      - name: Sign and notarize
+        if: env.MACOS_CERT_P12 != ''
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/sign.keychain-db"; security create-keychain -p ci "$kc"
+          security set-keychain-settings -lut 3600 "$kc"; security unlock-keychain -p ci "$kc"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$kc"
+          security list-keychains -d user -s "$kc" login.keychain
+          codesign --force --deep --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "build/bin/ESP Crypt.app"
+          ditto -c -k --keepParent "build/bin/ESP Crypt.app" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "build/bin/ESP Crypt.app"
+      - name: Build CLI (universal)
+        run: |
+          v="${{ needs.version.outputs.version }}"
+          GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=$v" -o build/cli-arm64 ./cli
+          GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=$v" -o build/cli-amd64 ./cli
+          lipo -create -output build/espcrypt build/cli-arm64 build/cli-amd64
+          tar -czf "build/bin/espcrypt-cli-$v-macOS-universal.tar.gz" -C build espcrypt
+      - name: Package
+        run: |
+          cd build/bin
+          ditto -c -k --keepParent "ESP Crypt.app" "ESP-Crypt-${{ needs.version.outputs.version }}-macOS-universal.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            build/bin/*.zip
+            build/bin/*.tar.gz
+
+  cli:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: Build CLI (Linux, Windows)
+        run: |
+          v="${{ needs.version.outputs.version }}"; mkdir -p out
+          for t in linux/amd64:linux-x64 linux/arm64:linux-arm64 windows/amd64:windows-x64; do
+            os="${t%%/*}"; rest="${t#*/}"; arch="${rest%%:*}"; name="${t##*:}"
+            exe=espcrypt; [ "$os" = windows ] && exe=espcrypt.exe
+            mkdir -p "b/$name"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$v" -o "b/$name/$exe" ./cli
+            if [ "$os" = windows ]; then (cd "b/$name" && zip -q "../../out/espcrypt-cli-$v-$name.zip" "$exe")
+            else tar -czf "out/espcrypt-cli-$v-$name.tar.gz" -C "b/$name" "$exe"; fi
+          done
+      - uses: actions/upload-artifact@v4
+        with: { name: cli, path: out/* }
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Install Wails CLI
+        shell: bash
+        run: bash scripts/install-wails.sh
+      - name: Ensure NSIS
+        shell: pwsh
+        run: if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) { choco install nsis -y --no-progress }
+      - name: Set version
+        shell: pwsh
+        run: |
+          $w = Get-Content wails.json -Raw | ConvertFrom-Json
+          $w.info.productVersion = "${{ needs.version.outputs.version }}"
+          $w | ConvertTo-Json -Depth 10 | Set-Content wails.json -Encoding utf8NoBOM
+      - name: Build app + installer
+        shell: pwsh
+        run: |
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+          wails build -platform windows/amd64 -clean -nsis -ldflags "-X main.appVersion=${{ needs.version.outputs.version }}"
+          $v = "${{ needs.version.outputs.version }}"
+          Move-Item "build/bin/ESP-Crypt.exe" "build/bin/ESP-Crypt-$v-windows-x64.exe"
+          Get-ChildItem build/bin/*installer*.exe | ForEach-Object { Move-Item $_.FullName "build/bin/ESP-Crypt-$v-windows-x64-setup.exe" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            build/bin/ESP-Crypt-*.exe
+
+  release:
+    needs: [version, macos, windows, cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: ESP Crypt ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: dist/*
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          files: dist/SHA256SUMS
