@@ -1,5 +1,7 @@
 Unicode true
 
+!define REQUEST_EXECUTION_LEVEL "user"
+!define WAILS_INSTALL_SCOPE "user"
 !include "wails_tools.nsh"
 
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
