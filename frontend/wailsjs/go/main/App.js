@@ -6,6 +6,10 @@ export function AgentStatus() {
   return window['go']['main']['App']['AgentStatus']();
 }
 
+export function AppVersion() {
+  return window['go']['main']['App']['AppVersion']();
+}
+
 export function BackupToFile() {
   return window['go']['main']['App']['BackupToFile']();
 }
