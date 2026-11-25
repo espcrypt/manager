@@ -1,0 +1,11 @@
+build/bin/
+frontend/node_modules/
+frontend/dist/*
+!frontend/dist/.gitkeep
+test-results/
+*.log
+/espcrypt
+/espcrypt.exe
+.DS_Store
+/build/espcrypt
+/build/picohsm
