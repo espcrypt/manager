@@ -44,6 +44,14 @@ jobs:
           jq --arg v "${{ needs.version.outputs.version }}" '.info.productVersion = $v' wails.json > w.json && mv w.json wails.json
       - name: Build universal app
         run: wails build -platform darwin/universal -clean -ldflags "-X main.appVersion=${{ needs.version.outputs.version }}"
+      - name: Apple Silicon and Intel apps
+        run: |
+          for a in arm64 x86_64; do
+            d="build/$a"; mkdir -p "$d"
+            ditto "build/bin/ESP Crypt.app" "$d/ESP Crypt.app"
+            for f in "$d/ESP Crypt.app/Contents/MacOS/"*; do lipo "$f" -thin $a -output "$f.thin" && mv "$f.thin" "$f"; done
+            codesign --force --deep --sign - "$d/ESP Crypt.app"
+          done
       - name: Sign and notarize
         if: env.MACOS_CERT_P12 != ''
         env:
@@ -60,10 +68,12 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k ci "$kc"
           security list-keychains -d user -s "$kc" login.keychain
-          codesign --force --deep --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "build/bin/ESP Crypt.app"
-          ditto -c -k --keepParent "build/bin/ESP Crypt.app" "$RUNNER_TEMP/notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
-          xcrun stapler staple "build/bin/ESP Crypt.app"
+          for app in "build/bin/ESP Crypt.app" "build/arm64/ESP Crypt.app" "build/x86_64/ESP Crypt.app"; do
+            codesign --force --deep --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "$app"
+            ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notarize.zip"
+            xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+            xcrun stapler staple "$app"
+          done
       - name: Build CLI (universal)
         run: |
           v="${{ needs.version.outputs.version }}"
@@ -75,6 +85,8 @@ jobs:
         run: |
           cd build/bin
           ditto -c -k --keepParent "ESP Crypt.app" "ESP-Crypt-${{ needs.version.outputs.version }}-macOS-universal.zip"
+          ditto -c -k --keepParent "../arm64/ESP Crypt.app" "ESP-Crypt-mac-apple-silicon.zip"
+          ditto -c -k --keepParent "../x86_64/ESP Crypt.app" "ESP-Crypt-mac-intel.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -144,6 +156,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with: { path: dist, merge-multiple: true }
+      - name: Fixed download names
+        run: |
+          v="${{ needs.version.outputs.version }}"; cd dist
+          cp "ESP-Crypt-$v-windows-x64-setup.exe" ESP-Crypt-Setup.exe
+          cp "espcrypt-cli-$v-linux-x64.tar.gz" espcrypt-linux-x64.tar.gz
+          cp "espcrypt-cli-$v-linux-arm64.tar.gz" espcrypt-linux-arm64.tar.gz
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
