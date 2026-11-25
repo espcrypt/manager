@@ -8,6 +8,25 @@
   onMount(async () => { settings = await Go.GetSettings() })
   async function saveSettings() { await run(() => Go.SaveSettings($state.snapshot(settings)), 'Settings saved') }
 
+  let version = $state('')
+  let check = $state(null)
+  let checking = $state(false)
+  let installing = $state(false)
+  onMount(async () => { version = await Go.AppVersion() })
+  async function checkNow() {
+    checking = true
+    try { check = await Go.CheckForUpdate() } catch (e) { check = { error: String(e) } }
+    checking = false
+  }
+  async function installNow() {
+    installing = true
+    if (!(await run(() => Go.InstallUpdate(), 'Installing; ESP Crypt restarts'))) installing = false
+  }
+  async function setAuto(on) {
+    settings.noAutoUpdate = !on
+    await saveSettings()
+  }
+
   let pin = $state({ first: '', repeat: '' })
   let change = $state({ old: '', first: '', repeat: '' })
   let st = $derived(app.status)
@@ -66,6 +85,31 @@
     <div class="card-title"><Icon name="lock" /> Vaults</div>
     <label class="check items-start"><input type="checkbox" class="mt-0.5 shrink-0" bind:checked={settings.lockOnRemove} onchange={saveSettings} />
       <span><span class="font-medium">Lock vaults when the ESP Crypt is unplugged</span><span class="hint block">Open vaults stay open while the board, or its mirror board over USB, stays connected. Vaults never lock on a timer.</span></span></label>
+  </section>
+{/if}
+
+{#if settings}
+  <section class="card mb-5 max-w-3xl">
+    <div class="card-title"><Icon name="refresh" /> App updates</div>
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="min-w-48 flex-1 text-sm">
+        <div>This is ESP Crypt <span class="font-medium text-neutral-100">{version === 'dev' ? 'development build' : version || '…'}</span></div>
+        <div class="text-xs text-neutral-400">
+          {#if checking}Checking GitHub…
+          {:else if check?.error}<span class="text-amber-300">{check.error}</span>
+          {:else if check?.available}<span class="text-violet-300">ESP Crypt {check.latest} is available</span>
+          {:else if check && !check.latest}No release has been published yet.
+          {:else if check}You have the latest version{check.latest ? ` (${check.latest})` : ''}.
+          {:else}Not checked yet.{/if}
+        </div>
+      </div>
+      <button class="btn btn-sm" disabled={checking || installing} onclick={checkNow}><Icon name="refresh" /> Check now</button>
+      {#if check?.available}
+        <button class="btn btn-sm btn-primary" disabled={installing} onclick={installNow}>{installing ? 'Updating…' : `Update to ${check.latest}`}</button>
+      {/if}
+    </div>
+    <label class="check mt-4 items-start"><input type="checkbox" class="mt-0.5 shrink-0" checked={!settings.noAutoUpdate} onchange={(e) => setAuto(e.currentTarget.checked)} />
+      <span><span class="font-medium">Check for updates automatically</span><span class="hint block">At start and every 6 hours. A new version is only installed when you click Update.</span></span></label>
   </section>
 {/if}
 
