@@ -255,7 +255,7 @@ func (a *App) installWindows(setup string) error {
 	ps := fmt.Sprintf(`$ErrorActionPreference = 'Continue'
 Wait-Process -Id %d -Timeout 60 -ErrorAction SilentlyContinue
 try {
-  $p = Start-Process -FilePath %s -ArgumentList '/S' -Verb RunAs -Wait -PassThru
+  $p = Start-Process -FilePath %s -ArgumentList '/S' -Wait -PassThru
   Set-Content -Path %s -Value ("exit " + $p.ExitCode)
 } catch {
   Set-Content -Path %s -Value ("error " + $_.Exception.Message)
