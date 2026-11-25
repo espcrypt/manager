@@ -167,6 +167,7 @@ func (a *App) startup(ctx context.Context) {
 	go a.remoteLoop()
 	go a.statusLoop()
 	go a.updateLoop()
+	go a.reportUpdateResult()
 	go func() { _, _, _ = firmwareDir() }()
 	if a.GetSettings().AgentAutostart {
 		if err := a.StartAgent(); err != nil {
